@@ -1,0 +1,77 @@
+from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+import PyPDF2
+import io
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+BAREME_CP1_MATHS = ["théorème", "démonstration", "hypothèse", "conclusion", "donc"]
+
+# PAGE HTML POUR GOOGLE - NOUVEAU
+@app.get("/", response_class=HTMLResponse)
+def page_accueil():
+    return """
+    <html>
+        <head>
+            <title>Ax-KEHNDE - Arbitre Numérique Instantané CP1-Terminale Côte d'Ivoire</title>
+            <meta name="description" content="Correction automatique de copies CP1 à Terminale. Note instantanée avec K(p)=1. Arbitre numérique par Dr KEHNDE73.">
+            <meta name="keywords" content="Ax-KEHNDE, correcteur copie, CP1, Terminale, Côte d'Ivoire, K(p)=1">
+        </head>
+        <body>
+            <h1>Ax-KEHNDE Arbitre Numérique K(p)=1</h1>
+            <p>API de correction instantanée pour l'éducation ivoirienne CP1-Terminale.</p>
+            <h2>Tester l'Arbitre :</h2>
+            <p>Endpoint: POST /arbitrer</p>
+            <p>Upload PDF → Note + Commentaire + K(p) en 3 secondes</p>
+            <p>Contact: Dr KEHNDE73 GitHub</p>
+        </body>
+    </html>
+    """
+
+# ENDPOINT JSON POUR TEST API - ON GARDE
+@app.get("/status")
+def read_status():
+    return {"message": "Ax-KEHNDE ARBITRE NUMERIQUE INSTANTANE V1", "K(p)": 1}
+
+# ARBITRE V1 - TON CODE EXISTANT - ON GARDE
+@app.post("/arbitrer")
+async def arbitrer_copie(file: UploadFile = File(...)):
+    content = await file.read()
+    
+    texte = ""
+    try:
+        pdf = PyPDF2.PdfReader(io.BytesIO(content))
+        for page in pdf.pages:
+            texte += page.extract_text()
+    except:
+        return {"erreur": "PDF illisible", "K(p)": 0}
+    
+    score = 0
+    mots_trouves = []
+    for mot in BAREME_CP1_MATHS:
+        if mot.lower() in texte.lower():
+            score += 4
+            mots_trouves.append(mot)
+    
+    note = min(20, score)
+    kp = 1 if note >= 10 else 0
+    
+    commentaire = f"Copie {file.filename}: {len(mots_trouves)}/5 mots-cles du bareme CP1. "
+    commentaire += "Raisonnement structure K(p)=1." if kp == 1 else "Structure a renforcer K(p)=0."
+    
+    return {
+        "filename": file.filename,
+        "note": f"{note}/20",
+        "K(p)": kp,
+        "mots_cles_detectes": mots_trouves,
+        "commentaire": commentaire,
+        "arbitre": "Ax-KEHNDE V1"
+    }
