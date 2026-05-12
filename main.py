@@ -1,42 +1,44 @@
-from fastapi import FastAPI, UploadFile, Form
+from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
+from fastapi.responses import HTMLResponse
+import PyPDF2
+import io
 
-app = FastAPI(title="Correcteur CP1-Terminale", version="1.0")
+app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+BAREME_CP1_MATHS = ["théorème", "démonstration", "hypothèse", "conclusion", "donc"]
 
-# Autorise les requêtes depuis ton app mobile/web
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@app.get("/", response_class=HTMLResponse)
+def page_accueil():
+    html = "<html><head><title>Ax-KEHNDE - Arbitre Numerique Instantane CP1-Terminale CI</title>"
+    html += "<meta name='description' content='Correction automatique CP1-Terminale. Note instantanee K(p)=1. Par Dr KEHNDE73.'></head>"
+    html += "<body><h1>Ax-KEHNDE Arbitre Numerique K(p)=1</h1>"
+    html += "<p>API correction instantanee education ivoirienne.</p>"
+    html += "<p>Endpoint: POST /arbitrer - Upload PDF pour note immediate</p></body></html>"
+    return html
 
-@app.post("/corriger")
-async def corriger(
-    niveau: str = Form(...),  # Ex: CP1, CE2, 6eme, Terminale C, D, A
-    matiere: str = Form(...), # Ex: Maths, Français, Physique, SVT
-    file: UploadFile = None   # Photo ou PDF de la copie
-):
-    """
-    K(p)=1 : Corrige une copie du CP1 à la Terminale.
-    Tu mettras ton vrai algo IA ici plus tard.
-    """
-    # TODO: Remplacer par ton vrai calcul de note
-    note = 14.5
-    commentaire = f"Copie {niveau} en {matiere}. K(p)=1. Bonne démarche. Revoir calcul Q3."
-    
-    return {
-        "niveau": niveau,
-        "matiere": matiere,
-        "note": f"{note}/20",
-        "commentaire": commentaire,
-        "K(p)": 1
-    }
+@app.get("/status")
+def read_status():
+    return {"message": "Ax-KEHNDE ARBITRE NUMERIQUE V1", "K(p)": 1}
 
-@app.get("/")
-def home():
-    return {"status": "Correcteur CP1-Terminale Live", "K(p)": 1}
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+@app.post("/arbitrer")
+async def arbitrer_copie(file: UploadFile = File(...)):
+    content = await file.read()
+    texte = ""
+    try:
+        pdf = PyPDF2.PdfReader(io.BytesIO(content))
+        for page in pdf.pages:
+            texte += page.extract_text()
+    except:
+        return {"erreur": "PDF illisible", "K(p)": 0}
+    score = 0
+    mots_trouves = []
+    for mot in BAREME_CP1_MATHS:
+        if mot.lower() in texte.lower():
+            score += 4
+            mots_trouves.append(mot)
+    note = min(20, score)
+    kp = 1 if note >= 10 else 0
+    commentaire = f"Copie {file.filename}: {len(mots_trouves)}/5 mots-cles. "
+    commentaire += "Raisonnement structure K(p)=1." if kp == 1 else "Structure a renforcer K(p)=0."
+    return {"filename": file.filename, "note": f"{note}/20", "K(p)": kp, "mots_cles_detectes": mots_trouves, "commentaire": commentaire, "arbitre": "Ax-KEHNDE V1"}
