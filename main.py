@@ -26,7 +26,7 @@ async def corriger(
     note = 14.5
     commentaire = f"Copie {niveau} en {matiere}. K(p)=1. Bonne démarche. Revoir calcul Q3."
     
-    return {ss
+    return {
         "niveau": niveau,
         "matiere": matiere,
         "note": f"{note}/20",
